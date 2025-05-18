@@ -34,6 +34,9 @@ vim.opt.backup = false
 vim.opt.writebackup = false
 vim.opt.swapfile = false
 
+vim.opt.ignorecase = true
+vim.opt.smartcase  = true
+
 local DEFAULT_PROJECT_PATH = '~/dev/sdl3game'
 
 -- -----------------------------------------------------------------------------
@@ -67,11 +70,11 @@ function on_lsp_attach(client, bufnr)
   local buf = { buffer = bufnr, silent = true, noremap = true }
   vim.keymap.set('n', '<leader>d', vim.lsp.buf.definition, buf)
   vim.keymap.set('n', '<leader>i', vim.lsp.buf.hover, buf)
-  vim.keymap.set('i', '<c-i>', vim.lsp.buf.signature_help, buf)
   vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, buf)
   vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, buf)
   vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, buf)
   vim.keymap.set('n', '<leader>o', switch_source_header, { buffer=true, silent=true })
+  vim.keymap.set('i', '<c-s-space>', vim.lsp.buf.signature_help, buf)
 
   if client.server_capabilities.documentFormattingProvider then
     vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
@@ -115,7 +118,7 @@ require('lazy').setup({
       require('nvim-treesitter.configs').setup {
         ensure_installed = { 'c', 'cpp', 'lua', 'vim', 'bash' },
         highlight = { enable = true },
-        indent    = { enable = true },
+        indent = { enable = true },
       }
     end,
   },
@@ -160,7 +163,7 @@ require('lazy').setup({
       map('n', '<leader>f', tb.lsp_references, opts)
       map('n', '<leader>F', tb.grep_string, opts)
       map('n', '<leader>G', tb.live_grep, opts)
-      -- map('n', '<leader>fb', tb.buffers,       opts)  -- open buffers
+      map('n', '<leader>l', tb.buffers, opts)
       -- map('n', '<leader>fh', tb.help_tags,     opts)  -- help tags
     end,
   },
@@ -274,7 +277,7 @@ require('lazy').setup({
 })
 -- =============================================================================
 
-vim.o.guifont = 'Berkeley Mono:h12'
+vim.o.guifont = 'Berkeley Mono:h13'
 
 local appleInterfaceStyle = vim.fn.system({'defaults', 'read', '-g', 'AppleInterfaceStyle'})
 if appleInterfaceStyle:find('Dark') then
@@ -285,12 +288,33 @@ end
 
 if vim.g.neovide then
   vim.g.neovide_window_blurred = true
-  vim.g.neovide_transparency = 0.9
+  vim.g.neovide_opacity = 0.9
   vim.defer_fn(function() vim.cmd('NeovideFocus') end, 25)
   vim.cmd('cd '..DEFAULT_PROJECT_PATH)
+
+  local og_scroll = vim.g.neovide_scroll_animation_length
+  local og_cursor = vim.g.neovide_cursor_animation_length
+
+  vim.api.nvim_create_autocmd("BufLeave", {
+    callback = function()
+      vim.g.neovide_scroll_animation_length = 0
+      vim.g.neovide_cursor_animation_length = 0
+    end,
+  })
+  vim.api.nvim_create_autocmd("BufEnter", {
+    callback = function()
+      vim.fn.timer_start(70, function()
+        vim.g.neovide_scroll_animation_length = og_scroll
+        vim.g.neovide_cursor_animation_length = og_cursor
+      end)
+    end,
+  })
 end
 
 -- -----------------------------------------------------------------------------
+
+vim.keymap.set('n', '<c-w>\\', '<c-w>v<c-w>w')
+vim.keymap.set('n', '<c-w>-', '<c-w>s')
 
 -- enter to yank in visual mode
 vim.keymap.set('v', '<cr>', 'y')
