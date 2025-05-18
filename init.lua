@@ -15,7 +15,7 @@ vim.opt.rtp:prepend(lazypath)
 
 vim.g.mapleader = ' '
 vim.opt.clipboard = 'unnamedplus'
-vim.opt.completeopt = { "menu", "menuone" }
+vim.opt.completeopt = { 'menu', 'menuone' }
 
 vim.opt.number = true
 vim.opt.wrap = false
@@ -34,11 +34,13 @@ vim.opt.backup = false
 vim.opt.writebackup = false
 vim.opt.swapfile = false
 
+local DEFAULT_PROJECT_PATH = '~/dev/sdl3game'
+
 -- -----------------------------------------------------------------------------
 
 local function switch_source_header()
   local f = vim.api.nvim_buf_get_name(0)
-  local base, ext = f:match("(.+)%.(%w+)$")
+  local base, ext = f:match('(.+)%.(%w+)$')
   if not base then return end
   local candidates = {}
   if ext:match('c$') then
@@ -59,7 +61,7 @@ end
 
 -- -----------------------------------------------------------------------------
 
-local lsp_format_augrp = vim.api.nvim_create_augroup("LspFormatOnSave", {})
+local lsp_format_augrp = vim.api.nvim_create_augroup('LspFormatOnSave', {})
 
 function on_lsp_attach(client, bufnr)
   local buf = { buffer = bufnr, silent = true, noremap = true }
@@ -73,7 +75,7 @@ function on_lsp_attach(client, bufnr)
 
   if client.server_capabilities.documentFormattingProvider then
     vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
-    vim.api.nvim_create_autocmd("BufWritePre", {
+    vim.api.nvim_create_autocmd('BufWritePre', {
       group = lsp_format_augrp,
       buffer = bufnr,
       callback = function()
@@ -83,7 +85,7 @@ function on_lsp_attach(client, bufnr)
   end
 end
 
-vim.filetype.add { extension = { slang = "slang" } }
+vim.filetype.add { extension = { slang = 'slang' } }
 
 -- =============================================================================
 
@@ -93,7 +95,7 @@ require('lazy').setup({
   { 'djoshea/vim-autoread' }, -- auto-reload externally modified files
   { 'knsh14/vim-github-link' }, -- copy link to selection on github
   { 'mbbill/undotree' }, -- visualize/navigate undo tree
-  { 'neanias/everforest-nvim' }, -- colors
+  { 'Iron-E/nvim-highlite' }, -- colors
 -- -----------------------------------------------------------------------------
   {
     'stevearc/oil.nvim', -- filesystem browse/edit
@@ -122,7 +124,7 @@ require('lazy').setup({
     'neovim/nvim-lspconfig', -- language server protocol
     dependencies = { 'hrsh7th/cmp-nvim-lsp' },
     config = function()
-      local lspconfig = require("lspconfig")
+      local lspconfig = require('lspconfig')
 
       require('lspconfig').clangd.setup {
         cmd = {
@@ -228,45 +230,43 @@ require('lazy').setup({
   },
 -- -----------------------------------------------------------------------------
 
--- task runner (for build scripts etc)
 
 {
-  'stevearc/overseer.nvim',
+  'stevearc/overseer.nvim', -- task runner (for build scripts etc)
   dependencies = { 'nvim-lua/plenary.nvim' },
   config = function()
     local overseer = require('overseer')
     overseer.setup()
-
     overseer.register_template({
-      name = "build",
+      name = 'build',
       builder = function()
         return {
-          cmd = { "./build.sh" },
-          components = { { "on_output_quickfix", open = true }, "default" }
+          cmd = { './build.sh' },
+          components = { { 'on_output_quickfix', open = true }, 'default' }
         }
       end,
     })
     vim.keymap.set('n', '<f5>', function()
-      overseer.run_template({ name = "build" }, function(task, success)
+      overseer.run_template({ name = 'build' }, function(task, success)
         task:subscribe('on_complete', function(task, status)
-          if status == "SUCCESS" then
+          if status == 'SUCCESS' then
             vim.cmd('cclose')
             require('dap').run({
-              type = "lldb",
-              request = "launch",
-              program = function() return vim.fn.getcwd() .. "/bin/game" end,
-              cwd = "${workspaceFolder}",
+              type = 'lldb',
+              request = 'launch',
+              program = function() return vim.fn.getcwd() .. '/bin/game' end,
+              cwd = '${workspaceFolder}',
               stopOnEntry = false,
+              runInTerminal = true,
               args = {},
             })
           end
         end)
       end)
     end, {
-      desc = "Overseer: build → quickfix → launch DAP",
+      desc = 'Overseer: build → quickfix → launch DAP',
       silent = true,
     })
-
   end,
 },
 
@@ -274,22 +274,21 @@ require('lazy').setup({
 })
 -- =============================================================================
 
-vim.o.guifont = "Berkeley Mono:h12"
+vim.o.guifont = 'Berkeley Mono:h12'
 
--- vim.opt.makeprg = [[bash build.sh | sed -E 's/\x1B\[[0-9;]*[mK]//g']]
--- vim.keymap.set("n", "<leader>ob", "<cmd>make<CR>:copen<CR>", { silent = true })
-
-local appleInterfaceStyle = vim.fn.system({"defaults", "read", "-g", "AppleInterfaceStyle"})
-if appleInterfaceStyle:find("Dark") then
-  vim.cmd.colorscheme 'everforest'
-  vim.cmd 'highlight Normal guibg=#1C1C1C'
-  vim.cmd 'highlight NormalNC guibg=#1C1C1C'
+local appleInterfaceStyle = vim.fn.system({'defaults', 'read', '-g', 'AppleInterfaceStyle'})
+if appleInterfaceStyle:find('Dark') then
+  vim.cmd.colorscheme 'highlite-iceberg'
 else
   vim.cmd.colorscheme 'shine'
 end
 
-vim.g.neovide_window_blurred = true
-vim.g.neovide_transparency = 0.8
+if vim.g.neovide then
+  vim.g.neovide_window_blurred = true
+  vim.g.neovide_transparency = 0.9
+  vim.defer_fn(function() vim.cmd('NeovideFocus') end, 25)
+  vim.cmd('cd '..DEFAULT_PROJECT_PATH)
+end
 
 -- -----------------------------------------------------------------------------
 
@@ -311,8 +310,8 @@ vim.keymap.set('n', 'Q', '@q')
 
 vim.keymap.set('v', 'p', '"_dP') -- visual mode paste without register clobber
 vim.keymap.set('n', '<leader>p', 'viwP') -- paste over word
-vim.keymap.set('i', '<d-v>', '<c-r>"') -- paste in insert mode with cmd+v
-vim.keymap.set('c', '<d-v>', '<c-r>"') -- paste in command mode with cmd+v
+vim.keymap.set('i', '<d-v>', '<c-r>*') -- paste in insert mode with cmd+v
+vim.keymap.set('c', '<d-v>', '<c-r>*') -- paste in command mode with cmd+v
 
 -- split line
 vim.keymap.set('n', 'K', 'i<cr><esc>')
@@ -340,6 +339,14 @@ vim.keymap.set('n', '<leader>gp', '<cmd>split<cr>:e term://git push<cr>i')
 vim.keymap.set('n', '<leader>gl', '<cmd>Git log --all --graph --decorate --oneline --date=relative --pretty=format:"%h %ad %an%d :: %s"<cr>')
 vim.keymap.set('n', '<leader>gb', '<cmd>Git blame<cr>')
 
+-- quickfix navigation
+vim.keymap.set('n', '<leader>q', '<cmd>cclose<cr>')
+vim.keymap.set('n', '<leader>J', '<cmd>cnext<cr>')
+vim.keymap.set('n', '<leader>K', '<cmd>cprev<cr>')
+
+-- terminal split
+vim.keymap.set('n', '<c-`>', '<c-w>s:terminal<cr>i')
+
 -- -----------------------------------------------------------------------------
 
 -- don't auto-insert comments
@@ -347,9 +354,9 @@ vim.cmd('autocmd BufEnter * set formatoptions-=cro')
 vim.cmd('autocmd BufEnter * setlocal formatoptions-=cro')
 
 -- trim trailing whitespace
-vim.api.nvim_create_autocmd("BufWritePre", {
-  pattern = "*",
-  command = "%s/\\s\\+$//e",
+vim.api.nvim_create_autocmd('BufWritePre', {
+  pattern = '*',
+  command = '%s/\\s\\+$//e',
 })
 
 -- shortcut to save all and then close hidden buffers
@@ -381,29 +388,29 @@ local function init_dap_data_breakpoint()
   M._bps = {}
 
   local function ensure_session()
-    local dap = require("dap")
+    local dap = require('dap')
     local session = dap.session()
     if not session then
-      vim.notify("nvim-dap: no active debug session", vim.log.levels.ERROR)
+      vim.notify('nvim-dap: no active debug session', vim.log.levels.ERROR)
     end
     return session
   end
 
-  function M.add(addr, size, access) -- access: "write","read","readWrite"
+  function M.add(addr, size, access) -- access: 'write','read','readWrite'
     size = tonumber(size) or 1
-    access = access or "write"
+    access = access or 'write'
 
-    local a = type(addr) == "number" and addr or tonumber(addr) or tonumber(addr:gsub("^0[xX]", ""), 16)
+    local a = type(addr) == 'number' and addr or tonumber(addr) or tonumber(addr:gsub('^0[xX]', ''), 16)
     if not a then
-      vim.notify("DapSetDataBreakpoint: invalid address: "..tostring(addr), vim.log.levels.ERROR)
+      vim.notify('DapSetDataBreakpoint: invalid address: '..tostring(addr), vim.log.levels.ERROR)
       return
     end
 
     -- de-duplicate by dataId
-    local data_id = string.format("%x/%d", a, size)
+    local data_id = string.format('%x/%d', a, size)
     for _,bp in ipairs(M._bps) do
       if bp.dataId == data_id then
-        vim.notify("Data breakpoint already set for 0x" ..string.format("%x",a).." ("..size.." B)")
+        vim.notify('Data breakpoint already set for 0x' ..string.format('%x',a)..' ('..size..' B)')
         return
       end
     end
@@ -411,15 +418,15 @@ local function init_dap_data_breakpoint()
 
     local session = ensure_session(); if not session then return end
     session:request(
-      "setDataBreakpoints",
+      'setDataBreakpoints',
       { breakpoints = M._bps },
       function(err, resp)
         if err then
-          vim.notify("setDataBreakpoints: "..err.message, vim.log.levels.ERROR)
+          vim.notify('setDataBreakpoints: '..err.message, vim.log.levels.ERROR)
           return
         end
         local bp = resp.body and resp.body.breakpoints[#resp.body.breakpoints]
-        vim.notify(string.format("📍 data BP @ 0x%X (%d B) → %s", a, size, (bp and bp.verified) and "verified" or "NOT verified"))
+        vim.notify(string.format('Data breakpoint @ 0x%X (%d B) → %s', a, size, (bp and bp.verified) and 'verified' or 'NOT verified'))
       end
     )
   end
@@ -427,20 +434,20 @@ local function init_dap_data_breakpoint()
   function M.clear()
     M._bps = {}
     local session = ensure_session(); if not session then return end
-    session:request("setDataBreakpoints", { breakpoints = {} }, function() end)
-    vim.notify("All data breakpoints cleared")
+    session:request('setDataBreakpoints', { breakpoints = {} }, function() end)
+    vim.notify('All data breakpoints cleared')
   end
 
   vim.api.nvim_create_user_command(
-    "DapSetDataBreakpoint",
+    'DapSetDataBreakpoint',
     function(opts) M.add(opts.fargs[1], opts.fargs[2]) end,
-    {nargs = "+", desc = "Set LLDB data breakpoint"}
+    {nargs = '+', desc = 'Set LLDB data breakpoint'}
   )
 
   vim.api.nvim_create_user_command(
-    "DapClearDataBreakpoints",
+    'DapClearDataBreakpoints',
     function() M.clear() end,
-    {nargs = 0,  desc = "Remove all LLDB data breakpoints"}
+    {nargs = 0,  desc = 'Remove all LLDB data breakpoints'}
   )
 end
 init_dap_data_breakpoint()
@@ -449,23 +456,23 @@ init_dap_data_breakpoint()
 -- keep focus in the DAP stack list when selecting items in it
 
 function init_dap_stay_in_stack_window_when_selecting_item()
-  local util = require("dapui.util")
+  local util = require('dapui.util')
 
   if not util.__stack_focus_patch then
     util.__stack_focus_patch = true
     local apply_orig = util.apply_mapping
 
     util.apply_mapping = function(keys, fn, buffer, action)
-      if  action == "open"
+      if  action == 'open'
           and vim.api.nvim_buf_is_valid(buffer)
-          and vim.api.nvim_buf_get_option(buffer, "filetype") == "dapui_stacks"
-          and type(fn) == "function"
+          and vim.api.nvim_buf_get_option(buffer, 'filetype') == 'dapui_stacks'
+          and type(fn) == 'function'
       then
         local original_fn = fn
         fn = function(...)
           original_fn(...)
           vim.schedule(function()
-            pcall(vim.cmd, "wincmd p")
+            pcall(vim.cmd, 'wincmd p')
           end)
         end
       end
@@ -474,6 +481,43 @@ function init_dap_stay_in_stack_window_when_selecting_item()
   end
 end
 init_dap_stay_in_stack_window_when_selecting_item()
+
+-- -----------------------------------------------------------------------------
+-- command+click to go to file:line:column locations
+
+vim.api.nvim_create_autocmd('BufEnter', {
+  callback = function()
+    if vim.bo.buftype == '' and vim.bo.buflisted then
+      vim.g.__last_code_win = vim.fn.win_getid()
+    end
+  end,
+})
+
+vim.keymap.set('n', '<d-leftrelease>', function()
+  local target = vim.fn.expand('<cWORD>')
+  target = target:gsub(':+$', '')
+
+  local file, line, col = target:match('(.+):(%d+):(%d+)$')
+  if not file then file, line = target:match('(.+):(%d+)$') end
+  if not file then return end
+
+  if vim.bo.buftype ~= '' and vim.g.__last_code_win then
+    if vim.api.nvim_win_is_valid(vim.g.__last_code_win) then
+      vim.api.nvim_set_current_win(vim.g.__last_code_win)
+    end
+  end
+
+  vim.cmd('edit ' .. vim.fn.fnameescape(file))
+
+  -- f) move to line and column
+  local lnum = tonumber(line)
+  if col then
+    local cnum = tonumber(col) - 1   -- nvim_win_set_cursor expects 0-based col
+    vim.api.nvim_win_set_cursor(0, {lnum, cnum})
+  else
+    vim.api.nvim_win_set_cursor(0, {lnum, 0})
+  end
+end, { silent = true })
 
 -- -----------------------------------------------------------------------------
 -- =============================================================================
