@@ -23,6 +23,7 @@ vim.opt.cursorline = true
 vim.opt.termguicolors = true
 vim.opt.lazyredraw = true
 vim.opt.splitbelow = true
+vim.opt.signcolumn = "yes"
 
 vim.opt.expandtab = true
 vim.opt.shiftwidth = 4
@@ -62,34 +63,6 @@ local function switch_source_header()
   vim.notify('No counterpart for ' .. f, vim.log.levels.WARN)
 end
 
--- -----------------------------------------------------------------------------
-
-local lsp_format_augrp = vim.api.nvim_create_augroup('LspFormatOnSave', {})
-
-function on_lsp_attach(client, bufnr)
-  local buf = { buffer = bufnr, silent = true, noremap = true }
-  vim.keymap.set('n', '<leader>d', vim.lsp.buf.definition, buf)
-  vim.keymap.set('n', '<leader>i', vim.lsp.buf.hover, buf)
-  vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, buf)
-  vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, buf)
-  vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, buf)
-  vim.keymap.set('n', '<leader>o', switch_source_header, { buffer=true, silent=true })
-  vim.keymap.set('i', '<c-s-space>', vim.lsp.buf.signature_help, buf)
-
-  if client.server_capabilities.documentFormattingProvider then
-    vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
-    vim.api.nvim_create_autocmd('BufWritePre', {
-      group = lsp_format_augrp,
-      buffer = bufnr,
-      callback = function()
-        vim.lsp.buf.format({ bufnr = bufnr, timeout_ms = 2000 })
-      end,
-    })
-  end
-end
-
-vim.filetype.add { extension = { slang = 'slang' } }
-
 -- =============================================================================
 
 require('lazy').setup({
@@ -107,7 +80,7 @@ require('lazy').setup({
           view_options = { show_hidden = true }
       })
       vim.keymap.set('n', '-', require('oil').open, { desc = 'open parent directory' })
-      -- NB: backtick changes cwd to the directory open in oil
+      -- NB: backtick changes working directory to the one currently open in oil
     end
   },
 -- -----------------------------------------------------------------------------
@@ -128,22 +101,62 @@ require('lazy').setup({
     dependencies = { 'hrsh7th/cmp-nvim-lsp' },
     config = function()
       local lspconfig = require('lspconfig')
+      local pid = tostring(vim.fn.getpid())
+      local lsp_format_augrp = vim.api.nvim_create_augroup('LspFormatOnSave', {})
 
-      require('lspconfig').clangd.setup {
+      function on_lsp_attach(client, bufnr)
+        local buf = { buffer = bufnr, silent = true, noremap = true }
+        vim.keymap.set('n', '<leader>d', vim.lsp.buf.definition, buf)
+        vim.keymap.set('n', '<leader>i', vim.lsp.buf.hover, buf)
+        vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, buf)
+        vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, buf)
+        vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, buf)
+        vim.keymap.set('n', '<leader>o', switch_source_header, { buffer=true, silent=true })
+        vim.keymap.set('i', '<c-s-space>', vim.lsp.buf.signature_help, buf)
+
+        if client.server_capabilities.documentFormattingProvider then
+          vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
+          vim.api.nvim_create_autocmd('BufWritePre', {
+            group = lsp_format_augrp,
+            buffer = bufnr,
+            callback = function()
+              vim.lsp.buf.format({ bufnr = bufnr, timeout_ms = 2000 })
+            end,
+          })
+        end
+      end
+
+      vim.filetype.add { extension = { slang = 'slang' } }
+
+      lspconfig.clangd.setup {
         cmd = {
           '/opt/homebrew/opt/llvm/bin/clangd',
           '--background-index',
           '--enable-config',
+          '--header-insertion=never',
           '--function-arg-placeholders=false',
         },
         root_dir = require('lspconfig.util').root_pattern('compile_commands.json', '.git'),
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
         on_attach = on_lsp_attach,
       }
-      require('lspconfig').slangd.setup {
+      lspconfig.slangd.setup {
         cmd = { 'vendor/slang/slangd', '--stdio' },
         filetypes = { 'slang' },
         root_dir = require('lspconfig.util').root_pattern('compile_commands.json', '.git'),
+        capabilities = require('cmp_nvim_lsp').default_capabilities(),
+        on_attach = on_lsp_attach,
+      }
+      lspconfig.omnisharp.setup{
+        cmd = {
+          "/Users/jaburns/.local/share/omnisharp/OmniSharp",
+          "--languageserver",
+          "--hostPID", pid
+        },
+        cmd_env= {
+            DOTNET_ROOT = '/usr/local/share/dotnet',
+        },
+        root_dir = require('lspconfig.util').root_pattern(".sln", "*.csproj", ".git"),
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
         on_attach = on_lsp_attach,
       }
@@ -164,7 +177,6 @@ require('lazy').setup({
       map('n', '<leader>F', tb.grep_string, opts)
       map('n', '<leader>G', tb.live_grep, opts)
       map('n', '<leader>l', tb.buffers, opts)
-      -- map('n', '<leader>fh', tb.help_tags,     opts)  -- help tags
     end,
   },
 -- -----------------------------------------------------------------------------
@@ -191,7 +203,7 @@ require('lazy').setup({
         },
         sources = {
           { name = 'nvim_lsp' },
-          { name = 'buffer' },
+          -- { name = 'buffer' },
         },
       }
     end,
@@ -206,6 +218,8 @@ require('lazy').setup({
     config = function()
       local dap = require('dap')
       local dapui = require('dapui')
+
+      -- TODO setup attach-to-unity using the vscode unity dap extension
 
       dapui.setup {
         element_mappings = {
@@ -226,14 +240,11 @@ require('lazy').setup({
 
       local map = vim.keymap.set
       map('n', '<leader>z', dapui.toggle, { silent=true })
-      -- map('n', '<F5>', function() dap.run(game_config) end, { silent=true })
       map('n', '<leader>b', dap.toggle_breakpoint, { silent=true })
       map('n', '<leader>B', function() dap.set_breakpoint(vim.fn.input('Breakpoint condition: ')) end, { silent=true })
     end,
   },
 -- -----------------------------------------------------------------------------
-
-
 {
   'stevearc/overseer.nvim', -- task runner (for build scripts etc)
   dependencies = { 'nvim-lua/plenary.nvim' },
@@ -250,6 +261,7 @@ require('lazy').setup({
       end,
     })
     vim.keymap.set('n', '<f5>', function()
+      -- TODO check here if dap is active, and if so then do dap.continue(), else run_template
       overseer.run_template({ name = 'build' }, function(task, success)
         task:subscribe('on_complete', function(task, status)
           if status == 'SUCCESS' then
@@ -272,12 +284,25 @@ require('lazy').setup({
     })
   end,
 },
-
 -- -----------------------------------------------------------------------------
 })
 -- =============================================================================
 
-vim.o.guifont = 'Berkeley Mono:h13'
+local function setup_font_size()
+  local font_size = 14
+  local function up()
+    font_size = font_size + 2
+    vim.o.guifont = 'Berkeley Mono:h'..font_size
+  end
+  local function down()
+    font_size = font_size - 2
+    vim.o.guifont = 'Berkeley Mono:h'..font_size
+  end
+  vim.keymap.set('n', '<d-=>', up)
+  vim.keymap.set('n', '<d-->', down)
+  vim.o.guifont = 'Berkeley Mono:h'..font_size
+end
+setup_font_size()
 
 local appleInterfaceStyle = vim.fn.system({'defaults', 'read', '-g', 'AppleInterfaceStyle'})
 if appleInterfaceStyle:find('Dark') then
@@ -295,24 +320,27 @@ if vim.g.neovide then
   local og_scroll = vim.g.neovide_scroll_animation_length
   local og_cursor = vim.g.neovide_cursor_animation_length
 
-  vim.api.nvim_create_autocmd("BufLeave", {
-    callback = function()
-      vim.g.neovide_scroll_animation_length = 0
-      vim.g.neovide_cursor_animation_length = 0
-    end,
-  })
-  vim.api.nvim_create_autocmd("BufEnter", {
-    callback = function()
-      vim.fn.timer_start(70, function()
-        vim.g.neovide_scroll_animation_length = og_scroll
-        vim.g.neovide_cursor_animation_length = og_cursor
-      end)
-    end,
-  })
+  -- TODO this is meant to prevent scrolling animations when switching buffers, but conflicts with
+  --      the code that disables scrolling when the DAP UI is showing
+  -- vim.api.nvim_create_autocmd("BufLeave", {
+  --   callback = function()
+  --     vim.g.neovide_scroll_animation_length = 0
+  --     vim.g.neovide_cursor_animation_length = 0
+  --   end,
+  -- })
+  -- vim.api.nvim_create_autocmd("BufEnter", {
+  --   callback = function()
+  --     vim.fn.timer_start(70, function()
+  --       vim.g.neovide_scroll_animation_length = og_scroll
+  --       vim.g.neovide_cursor_animation_length = og_cursor
+  --     end)
+  --   end,
+  -- })
 end
 
 -- -----------------------------------------------------------------------------
 
+-- window splits
 vim.keymap.set('n', '<c-w>\\', '<c-w>v<c-w>w')
 vim.keymap.set('n', '<c-w>-', '<c-w>s')
 
@@ -334,6 +362,7 @@ vim.keymap.set('n', 'Q', '@q')
 
 vim.keymap.set('v', 'p', '"_dP') -- visual mode paste without register clobber
 vim.keymap.set('n', '<leader>p', 'viwP') -- paste over word
+vim.keymap.set('n', '<leader>P', 'viWP') -- paste over WORD
 vim.keymap.set('i', '<d-v>', '<c-r>*') -- paste in insert mode with cmd+v
 vim.keymap.set('c', '<d-v>', '<c-r>*') -- paste in command mode with cmd+v
 
@@ -368,8 +397,10 @@ vim.keymap.set('n', '<leader>q', '<cmd>cclose<cr>')
 vim.keymap.set('n', '<leader>J', '<cmd>cnext<cr>')
 vim.keymap.set('n', '<leader>K', '<cmd>cprev<cr>')
 
--- terminal split
+-- terminal split, and terminal shortcuts
 vim.keymap.set('n', '<c-`>', '<c-w>s:terminal<cr>i')
+vim.keymap.set('t', '<d-v>', "<C-\\><C-n>:lua vim.fn.jobsend(vim.b.terminal_job_id, vim.fn.getreg('+'))<CR>a") -- fix paste with cmd+v
+vim.keymap.set('t', '<c-w>', '<c-\\><c-n><c-w>')
 
 -- -----------------------------------------------------------------------------
 
@@ -404,7 +435,7 @@ vim.keymap.set('n', '<leader>w', function()
 end, { noremap = true, silent = true })
 
 -- -----------------------------------------------------------------------------
--- data breakpoints for lldb.
+-- data breakpoints for lldb
 -- usage: :DapSetDataBreakpoint [0xADDRESS] [num bytes] [write/read/readWrite (default is write)]
 
 local function init_dap_data_breakpoint()
@@ -533,15 +564,42 @@ vim.keymap.set('n', '<d-leftrelease>', function()
 
   vim.cmd('edit ' .. vim.fn.fnameescape(file))
 
-  -- f) move to line and column
   local lnum = tonumber(line)
   if col then
-    local cnum = tonumber(col) - 1   -- nvim_win_set_cursor expects 0-based col
+    local cnum = tonumber(col) - 1
     vim.api.nvim_win_set_cursor(0, {lnum, cnum})
   else
     vim.api.nvim_win_set_cursor(0, {lnum, 0})
   end
 end, { silent = true })
+
+-- -----------------------------------------------------------------------------
+-- disable scroll animations when DAP UI is active so stdout console is readable
+
+do
+  local default_scroll = vim.g.neovide_scroll_animation_length
+
+  local function dapui_repl_visible()
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.api.nvim_buf_get_option(buf, 'filetype') == 'dapui_console' then
+        return true
+      end
+    end
+    return false
+  end
+
+  local function update_neovide_scroll()
+    if dapui_repl_visible() then
+      vim.g.neovide_scroll_animation_length = 0
+    else
+      vim.g.neovide_scroll_animation_length = default_scroll
+    end
+  end
+
+  vim.api.nvim_create_autocmd({ "WinNew", "WinClosed" }, { callback = update_neovide_scroll })
+  update_neovide_scroll()
+end
 
 -- -----------------------------------------------------------------------------
 -- =============================================================================
