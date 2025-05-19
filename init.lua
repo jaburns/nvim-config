@@ -1,4 +1,10 @@
 -- =============================================================================
+-- debugger notes
+--   show backtrace: `bt
+--   print bytes:    `memory read --format x --size 1 --count {NUM} {0xADDRESS}
+--   print array:    `parray {LEN} {VARNAME}
+--   watch array:    *({TYPE}(*)[{LEN}]){VARNAME}
+-- =============================================================================
 -- -----------------------------------------------------------------------------
 
 local lazypath = vim.fn.stdpath('data') .. '/lazy/lazy.nvim'
@@ -307,11 +313,11 @@ require('lazy').setup({
 
 vim._j.font_size = 14
 local function up()
-  vim._j.font_size = vim._j.font_size + 2
+  vim._j.font_size = vim._j.font_size + 1
   vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
 end
 local function down()
-  vim._j.font_size = vim._j.font_size - 2
+  vim._j.font_size = vim._j.font_size - 1
   vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
 end
 vim.keymap.set('n', '<d-=>', up)
@@ -321,6 +327,8 @@ vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
 local apply_style = vim.fn.system({'defaults', 'read', '-g', 'AppleInterfaceStyle'})
 if apply_style:find('Dark') then
   vim.cmd.colorscheme 'highlite-iceberg'
+  vim.cmd.highlight 'Normal guibg=#1E2132'
+  vim.cmd.highlight 'NormalNC guibg=#1E2132'
 else
   vim.cmd.colorscheme 'shine'
 end
@@ -328,6 +336,8 @@ end
 -- -----------------------------------------------------------------------------
 -- neovide-specific config
 if vim.g.neovide then
+  vim.g.neovide_text_gamma = 1 -- default 0
+  vim.g.neovide_text_contrast = 0 -- default 0.5
 
   vim.g.neovide_window_blurred = true
   vim.g.neovide_opacity = 0.9
@@ -335,9 +345,9 @@ if vim.g.neovide then
   vim.cmd('cd '..DEFAULT_PROJECT_PATH)
 
   vim._j.scroll_enabled = true
-  vim._j.scroll_speed = 0.15
+  vim._j.scroll_speed = 0.15 -- default 0.3
   vim.g.neovide_scroll_animation_length = vim._j.scroll_speed
-  vim.g.neovide_cursor_animation_length = 0.1
+  vim.g.neovide_cursor_animation_length = 0.1 -- default 0.15
 
   -- disable scroll animation when DAP UI is visible so console logs are readable
   local function dapui_repl_visible()
@@ -381,7 +391,7 @@ function setup_jump_to_project(num, path)
     vim.notify('jumped to '..path)
   end)
 end
-setup_jump_to_project(1, '~/dev/sdl3game')
+setup_jump_to_project(1, DEFAULT_PROJECT_PATH)
 setup_jump_to_project(2, '~/dev/kaizogame')
 
 -- window splits
