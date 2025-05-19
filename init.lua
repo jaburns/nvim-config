@@ -10,6 +10,7 @@ if not vim.loop.fs_stat(lazypath) then
   })
 end
 vim.opt.rtp:prepend(lazypath)
+vim._j = {} -- custom global state
 
 -- -----------------------------------------------------------------------------
 
@@ -154,7 +155,7 @@ require('lazy').setup({
           "--hostPID", pid
         },
         cmd_env= {
-            DOTNET_ROOT = '/usr/local/share/dotnet',
+            DOTNET_ROOT = '/opt/homebrew/Cellar/dotnet/9.0.5/libexec',
         },
         root_dir = require('lspconfig.util').root_pattern(".sln", "*.csproj", ".git"),
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
@@ -219,8 +220,6 @@ require('lazy').setup({
       local dap = require('dap')
       local dapui = require('dapui')
 
-      -- TODO setup attach-to-unity using the vscode unity dap extension
-
       dapui.setup {
         element_mappings = {
           stacks = {
@@ -229,17 +228,20 @@ require('lazy').setup({
           }
         },
       }
+
       dap.adapters.lldb = {
         type = 'executable',
         command = '/opt/homebrew/opt/llvm/bin/lldb-dap',
         name = 'lldb'
       }
+
       dap.listeners.after.event_initialized['dapui_config'] = function() dapui.open() end
       dap.listeners.before.event_terminated['dapui_config'] = function() dapui.close() end
       dap.listeners.before.event_exited['dapui_config'] = function() dapui.close() end
 
       local map = vim.keymap.set
       map('n', '<leader>z', dapui.toggle, { silent=true })
+      map('n', '<leader>c', dap.continue, { silent=true })
       map('n', '<leader>b', dap.toggle_breakpoint, { silent=true })
       map('n', '<leader>B', function() dap.set_breakpoint(vim.fn.input('Breakpoint condition: ')) end, { silent=true })
     end,
@@ -261,12 +263,16 @@ require('lazy').setup({
       end,
     })
     vim.keymap.set('n', '<f5>', function()
-      -- TODO check here if dap is active, and if so then do dap.continue(), else run_template
+      local dap = require('dap')
+      if dap.session() then
+        dap.continue()
+        return
+      end
       overseer.run_template({ name = 'build' }, function(task, success)
         task:subscribe('on_complete', function(task, status)
           if status == 'SUCCESS' then
             vim.cmd('cclose')
-            require('dap').run({
+            dap.run({
               type = 'lldb',
               request = 'launch',
               program = function() return vim.fn.getcwd() .. '/bin/game' end,
@@ -287,57 +293,75 @@ require('lazy').setup({
 -- -----------------------------------------------------------------------------
 })
 -- =============================================================================
+-- font and colors
 
-local function setup_font_size()
-  local font_size = 14
-  local function up()
-    font_size = font_size + 2
-    vim.o.guifont = 'Berkeley Mono:h'..font_size
-  end
-  local function down()
-    font_size = font_size - 2
-    vim.o.guifont = 'Berkeley Mono:h'..font_size
-  end
-  vim.keymap.set('n', '<d-=>', up)
-  vim.keymap.set('n', '<d-->', down)
-  vim.o.guifont = 'Berkeley Mono:h'..font_size
+vim._j.font_size = 14
+local function up()
+  vim._j.font_size = vim._j.font_size + 2
+  vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
 end
-setup_font_size()
+local function down()
+  vim._j.font_size = vim._j.font_size - 2
+  vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
+end
+vim.keymap.set('n', '<d-=>', up)
+vim.keymap.set('n', '<d-->', down)
+vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
 
-local appleInterfaceStyle = vim.fn.system({'defaults', 'read', '-g', 'AppleInterfaceStyle'})
-if appleInterfaceStyle:find('Dark') then
+local apply_style = vim.fn.system({'defaults', 'read', '-g', 'AppleInterfaceStyle'})
+if apply_style:find('Dark') then
   vim.cmd.colorscheme 'highlite-iceberg'
 else
   vim.cmd.colorscheme 'shine'
 end
 
+-- -----------------------------------------------------------------------------
+-- neovide-specific config
 if vim.g.neovide then
+
   vim.g.neovide_window_blurred = true
   vim.g.neovide_opacity = 0.9
   vim.defer_fn(function() vim.cmd('NeovideFocus') end, 25)
   vim.cmd('cd '..DEFAULT_PROJECT_PATH)
 
-  local og_scroll = vim.g.neovide_scroll_animation_length
-  local og_cursor = vim.g.neovide_cursor_animation_length
+  vim._j.scroll_enabled = true
+  vim._j.scroll_speed = 0.15
+  vim.g.neovide_scroll_animation_length = vim._j.scroll_speed
+  vim.g.neovide_cursor_animation_length = 0.1
 
-  -- TODO this is meant to prevent scrolling animations when switching buffers, but conflicts with
-  --      the code that disables scrolling when the DAP UI is showing
-  -- vim.api.nvim_create_autocmd("BufLeave", {
-  --   callback = function()
-  --     vim.g.neovide_scroll_animation_length = 0
-  --     vim.g.neovide_cursor_animation_length = 0
-  --   end,
-  -- })
-  -- vim.api.nvim_create_autocmd("BufEnter", {
-  --   callback = function()
-  --     vim.fn.timer_start(70, function()
-  --       vim.g.neovide_scroll_animation_length = og_scroll
-  --       vim.g.neovide_cursor_animation_length = og_cursor
-  --     end)
-  --   end,
-  -- })
+  -- disable scroll animation when DAP UI is visible so console logs are readable
+  local function dapui_repl_visible()
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.api.nvim_buf_get_option(buf, 'filetype') == 'dapui_console' then
+        return true
+      end
+    end
+    return false
+  end
+  vim.api.nvim_create_autocmd({ "WinNew", "WinClosed" }, { callback = function()
+    if dapui_repl_visible() then
+      vim._j.scroll_enabled = false
+      vim.g.neovide_scroll_animation_length = 0
+    else
+      vim._j.scroll_enabled = true
+      vim.g.neovide_scroll_animation_length = vim._j.scroll_speed
+    end
+  end})
+
+  -- disable confusing scroll animation when switching between buffers
+  vim.api.nvim_create_autocmd("BufLeave", { callback = function()
+    vim.g.neovide_scroll_animation_length = 0
+  end})
+  vim.api.nvim_create_autocmd("BufEnter", { callback = function()
+    vim.fn.timer_start(100, function()
+      if vim._j.scroll_enabled then
+        vim.g.neovide_scroll_animation_length = vim._j.scroll_speed
+      end
+    end)
+  end})
+
 end
-
 -- -----------------------------------------------------------------------------
 
 -- window splits
@@ -401,8 +425,6 @@ vim.keymap.set('n', '<leader>K', '<cmd>cprev<cr>')
 vim.keymap.set('n', '<c-`>', '<c-w>s:terminal<cr>i')
 vim.keymap.set('t', '<d-v>', "<C-\\><C-n>:lua vim.fn.jobsend(vim.b.terminal_job_id, vim.fn.getreg('+'))<CR>a") -- fix paste with cmd+v
 vim.keymap.set('t', '<c-w>', '<c-\\><c-n><c-w>')
-
--- -----------------------------------------------------------------------------
 
 -- don't auto-insert comments
 vim.cmd('autocmd BufEnter * set formatoptions-=cro')
@@ -572,34 +594,6 @@ vim.keymap.set('n', '<d-leftrelease>', function()
     vim.api.nvim_win_set_cursor(0, {lnum, 0})
   end
 end, { silent = true })
-
--- -----------------------------------------------------------------------------
--- disable scroll animations when DAP UI is active so stdout console is readable
-
-do
-  local default_scroll = vim.g.neovide_scroll_animation_length
-
-  local function dapui_repl_visible()
-    for _, win in ipairs(vim.api.nvim_list_wins()) do
-      local buf = vim.api.nvim_win_get_buf(win)
-      if vim.api.nvim_buf_get_option(buf, 'filetype') == 'dapui_console' then
-        return true
-      end
-    end
-    return false
-  end
-
-  local function update_neovide_scroll()
-    if dapui_repl_visible() then
-      vim.g.neovide_scroll_animation_length = 0
-    else
-      vim.g.neovide_scroll_animation_length = default_scroll
-    end
-  end
-
-  vim.api.nvim_create_autocmd({ "WinNew", "WinClosed" }, { callback = update_neovide_scroll })
-  update_neovide_scroll()
-end
 
 -- -----------------------------------------------------------------------------
 -- =============================================================================
