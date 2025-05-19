@@ -24,7 +24,7 @@ vim.opt.cursorline = true
 vim.opt.termguicolors = true
 vim.opt.lazyredraw = true
 vim.opt.splitbelow = true
-vim.opt.signcolumn = "yes"
+vim.opt.signcolumn = 'yes'
 
 vim.opt.expandtab = true
 vim.opt.shiftwidth = 4
@@ -99,31 +99,41 @@ require('lazy').setup({
 -- -----------------------------------------------------------------------------
   {
     'neovim/nvim-lspconfig', -- language server protocol
-    dependencies = { 'hrsh7th/cmp-nvim-lsp' },
+    dependencies = {
+      'hrsh7th/cmp-nvim-lsp',
+      'Hoffs/omnisharp-extended-lsp.nvim',
+    },
     config = function()
       local lspconfig = require('lspconfig')
       local pid = tostring(vim.fn.getpid())
       local lsp_format_augrp = vim.api.nvim_create_augroup('LspFormatOnSave', {})
+      local omnix = require('omnisharp_extended')
 
-      function on_lsp_attach(client, bufnr)
-        local buf = { buffer = bufnr, silent = true, noremap = true }
-        vim.keymap.set('n', '<leader>d', vim.lsp.buf.definition, buf)
-        vim.keymap.set('n', '<leader>i', vim.lsp.buf.hover, buf)
-        vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, buf)
-        vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, buf)
-        vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, buf)
-        vim.keymap.set('n', '<leader>o', switch_source_header, { buffer=true, silent=true })
-        vim.keymap.set('i', '<c-s-space>', vim.lsp.buf.signature_help, buf)
+      function on_lsp_attach(lang)
+        return function(client, bufnr)
+          local buf = { buffer = bufnr, silent = true, noremap = true }
+          if lang == 'c#' then
+            vim.keymap.set('n', '<leader>d', omnix.lsp_definition, buf)
+          else
+            vim.keymap.set('n', '<leader>d', vim.lsp.buf.definition, buf)
+          end
+          vim.keymap.set('n', '<leader>i', vim.lsp.buf.hover, buf)
+          vim.keymap.set('n', '<leader>e', vim.diagnostic.open_float, buf)
+          vim.keymap.set('n', '<leader>r', vim.lsp.buf.rename, buf)
+          vim.keymap.set('n', '<leader>a', vim.lsp.buf.code_action, buf)
+          vim.keymap.set('n', '<leader>o', switch_source_header, { buffer=true, silent=true })
+          vim.keymap.set('i', '<c-s-space>', vim.lsp.buf.signature_help, buf)
 
-        if client.server_capabilities.documentFormattingProvider then
-          vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
-          vim.api.nvim_create_autocmd('BufWritePre', {
-            group = lsp_format_augrp,
-            buffer = bufnr,
-            callback = function()
-              vim.lsp.buf.format({ bufnr = bufnr, timeout_ms = 2000 })
-            end,
-          })
+          if client.server_capabilities.documentFormattingProvider then
+            vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
+            vim.api.nvim_create_autocmd('BufWritePre', {
+              group = lsp_format_augrp,
+              buffer = bufnr,
+              callback = function()
+                vim.lsp.buf.format({ bufnr = bufnr, timeout_ms = 2000 })
+              end,
+            })
+          end
         end
       end
 
@@ -139,27 +149,27 @@ require('lazy').setup({
         },
         root_dir = require('lspconfig.util').root_pattern('compile_commands.json', '.git'),
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
-        on_attach = on_lsp_attach,
+        on_attach = on_lsp_attach('c++'),
       }
       lspconfig.slangd.setup {
         cmd = { 'vendor/slang/slangd', '--stdio' },
         filetypes = { 'slang' },
         root_dir = require('lspconfig.util').root_pattern('compile_commands.json', '.git'),
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
-        on_attach = on_lsp_attach,
+        on_attach = on_lsp_attach('slang'),
       }
       lspconfig.omnisharp.setup{
         cmd = {
-          "/Users/jaburns/.local/share/omnisharp/OmniSharp",
-          "--languageserver",
-          "--hostPID", pid
+          vim.fn.expand('~/.local/share/omnisharp/OmniSharp'),
+          '--languageserver',
+          '--hostPID', pid
         },
         cmd_env= {
             DOTNET_ROOT = '/opt/homebrew/Cellar/dotnet/9.0.5/libexec',
         },
-        root_dir = require('lspconfig.util').root_pattern(".sln", "*.csproj", ".git"),
+        root_dir = require('lspconfig.util').root_pattern('.sln', '*.csproj', '.git'),
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
-        on_attach = on_lsp_attach,
+        on_attach = on_lsp_attach('c#'),
       }
     end,
   },
@@ -339,7 +349,7 @@ if vim.g.neovide then
     end
     return false
   end
-  vim.api.nvim_create_autocmd({ "WinNew", "WinClosed" }, { callback = function()
+  vim.api.nvim_create_autocmd({ 'WinNew', 'WinClosed' }, { callback = function()
     if dapui_repl_visible() then
       vim._j.scroll_enabled = false
       vim.g.neovide_scroll_animation_length = 0
@@ -350,10 +360,10 @@ if vim.g.neovide then
   end})
 
   -- disable confusing scroll animation when switching between buffers
-  vim.api.nvim_create_autocmd("BufLeave", { callback = function()
+  vim.api.nvim_create_autocmd('BufLeave', { callback = function()
     vim.g.neovide_scroll_animation_length = 0
   end})
-  vim.api.nvim_create_autocmd("BufEnter", { callback = function()
+  vim.api.nvim_create_autocmd('BufEnter', { callback = function()
     vim.fn.timer_start(100, function()
       if vim._j.scroll_enabled then
         vim.g.neovide_scroll_animation_length = vim._j.scroll_speed
@@ -363,6 +373,16 @@ if vim.g.neovide then
 
 end
 -- -----------------------------------------------------------------------------
+
+-- jump to project root dirs quickly
+function setup_jump_to_project(num, path)
+  vim.keymap.set('n', '<leader>'..num, function()
+    vim.cmd('cd '..path)
+    vim.notify('jumped to '..path)
+  end)
+end
+setup_jump_to_project(1, '~/dev/sdl3game')
+setup_jump_to_project(2, '~/dev/kaizogame')
 
 -- window splits
 vim.keymap.set('n', '<c-w>\\', '<c-w>v<c-w>w')
