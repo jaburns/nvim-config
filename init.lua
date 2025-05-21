@@ -73,6 +73,7 @@ end
 -- =============================================================================
 
 require('lazy').setup({
+
   { 'tpope/vim-sleuth' }, -- auto-determine indentation level
   { 'tpope/vim-fugitive' }, -- git integrations
   { 'djoshea/vim-autoread' }, -- auto-reload externally modified files
@@ -130,16 +131,14 @@ require('lazy').setup({
           vim.keymap.set('n', '<leader>o', switch_source_header, { buffer=true, silent=true })
           vim.keymap.set('i', '<c-s-space>', vim.lsp.buf.signature_help, buf)
 
-          if client.server_capabilities.documentFormattingProvider then
-            vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
-            vim.api.nvim_create_autocmd('BufWritePre', {
-              group = lsp_format_augrp,
-              buffer = bufnr,
-              callback = function()
-                vim.lsp.buf.format({ bufnr = bufnr, timeout_ms = 2000 })
-              end,
-            })
-          end
+          vim.api.nvim_clear_autocmds({ group = lsp_format_augrp, buffer = bufnr })
+          vim.api.nvim_create_autocmd('BufWritePre', {
+            group = lsp_format_augrp,
+            buffer = bufnr,
+            callback = function()
+              vim.lsp.buf.format({ bufnr = bufnr, timeout_ms = 2000 })
+            end,
+          })
         end
       end
 
@@ -235,7 +234,6 @@ require('lazy').setup({
     config = function()
       local dap = require('dap')
       local dapui = require('dapui')
-
       dapui.setup {
         element_mappings = {
           stacks = {
@@ -244,13 +242,16 @@ require('lazy').setup({
           }
         },
       }
-
+      dap.adapters.unity = {
+        type = 'executable',
+        command = '/opt/homebrew/bin/mono',
+        args = { vim.fn.expand('~/unity-nvim/extension/bin/UnityDebug.exe') }, -- downloaded and unzipped from https://github.com/Unity-Technologies/vscode-unity-debug/releases/download/Version-2.7.2/unity-debug-2.7.2.vsix
+      }
       dap.adapters.lldb = {
         type = 'executable',
         command = '/opt/homebrew/opt/llvm/bin/lldb-dap',
         name = 'lldb'
       }
-
       dap.listeners.after.event_initialized['dapui_config'] = function() dapui.open() end
       dap.listeners.before.event_terminated['dapui_config'] = function() dapui.close() end
       dap.listeners.before.event_exited['dapui_config'] = function() dapui.close() end
@@ -263,52 +264,81 @@ require('lazy').setup({
     end,
   },
 -- -----------------------------------------------------------------------------
-{
-  'stevearc/overseer.nvim', -- task runner (for build scripts etc)
-  dependencies = { 'nvim-lua/plenary.nvim' },
-  config = function()
-    local overseer = require('overseer')
-    overseer.setup()
-    overseer.register_template({
-      name = 'build',
-      builder = function()
-        return {
-          cmd = { './build.sh' },
-          components = { { 'on_output_quickfix', open = true }, 'default' }
-        }
-      end,
-    })
-    vim.keymap.set('n', '<f5>', function()
-      local dap = require('dap')
-      if dap.session() then
-        dap.continue()
-        return
-      end
-      overseer.run_template({ name = 'build' }, function(task, success)
-        task:subscribe('on_complete', function(task, status)
-          if status == 'SUCCESS' then
-            vim.cmd('cclose')
-            dap.run({
-              type = 'lldb',
-              request = 'launch',
-              program = function() return vim.fn.getcwd() .. '/bin/game' end,
-              cwd = '${workspaceFolder}',
-              stopOnEntry = false,
-              runInTerminal = true,
-              args = {},
-            })
-          end
-        end)
-      end)
-    end, {
-      desc = 'Overseer: build → quickfix → launch DAP',
-      silent = true,
-    })
-  end,
-},
+  {
+    'stevearc/overseer.nvim', -- task runner (for build scripts etc)
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    config = function()
+      local overseer = require('overseer')
+      overseer.setup()
+      overseer.register_template({
+        name = 'build',
+        builder = function()
+          return {
+            cmd = { './build.sh' },
+            components = { { 'on_output_quickfix', open = true }, 'default' }
+          }
+        end,
+      })
+    end,
+  },
+-- -----------------------------------------------------------------------------
+  {
+    "folke/trouble.nvim", -- nicer pane for compile errors and diagnostics
+    opts = {},
+    cmd = "Trouble",
+    keys = {
+      { "<leader>Q", "<cmd>Trouble diagnostics toggle<cr>", desc = "Diagnostics (Trouble)" },
+      { "<leader>q", "<cmd>Trouble qflist toggle<cr>", desc = "Quickfix List (Trouble)" },
+    },
+  }
 -- -----------------------------------------------------------------------------
 })
 -- =============================================================================
+
+-- f5 to build/run/debug/continue
+vim.keymap.set('n', '<f5>', function()
+  local overseer = require('overseer')
+  local dap = require('dap')
+  local filetype = vim.api.nvim_get_option_value('filetype', { buf = bufnr })
+
+  if dap.session() then
+    dap.continue()
+    return
+  end
+
+  if filetype == 'cs' or filetype == 'csharp' then
+    dap.run({
+      type = 'unity',
+      request = 'attach',
+      name = 'Unity Editor',
+    })
+    return
+  end
+
+  overseer.run_template({ name = 'build' }, function(task, success)
+    task:subscribe('on_complete', function(task, status)
+      vim.cmd('cclose')
+      if status == 'SUCCESS' then
+        dap.run({
+          type = 'lldb',
+          request = 'launch',
+          program = function() return vim.fn.getcwd() .. '/bin/game' end,
+          cwd = '${workspaceFolder}',
+          stopOnEntry = false,
+          runInTerminal = true,
+          args = {},
+        })
+      else
+        vim.cmd('Trouble qflist toggle')
+      end
+    end)
+  end)
+end, {
+  desc = 'Overseer: build → quickfix → launch DAP',
+  silent = true,
+})
+
+-- -----------------------------------------------------------------------------
 -- font and colors
 
 vim._j.font_size = 14
@@ -336,6 +366,10 @@ end
 -- -----------------------------------------------------------------------------
 -- neovide-specific config
 if vim.g.neovide then
+  -- enable opening a file in an existing instance with:
+  -- $ /opt/homebrew/bin/nvim --server /tmp/nvimsocket --remote-send ":e $1<cr>:$2<cr>:NeovideFocus<cr>"
+  vim.fn.serverstart('/tmp/nvimsocket')
+
   vim.g.neovide_text_gamma = 1 -- default 0
   vim.g.neovide_text_contrast = 0 -- default 0.5
 
@@ -445,11 +479,6 @@ vim.keymap.set('n', '<leader>gU', '<cmd>split<cr>:e term://git pull<cr>i')
 vim.keymap.set('n', '<leader>gp', '<cmd>split<cr>:e term://git push<cr>i')
 vim.keymap.set('n', '<leader>gl', '<cmd>Git log --all --graph --decorate --oneline --date=relative --pretty=format:"%h %ad %an%d :: %s"<cr>')
 vim.keymap.set('n', '<leader>gb', '<cmd>Git blame<cr>')
-
--- quickfix navigation
-vim.keymap.set('n', '<leader>q', '<cmd>cclose<cr>')
-vim.keymap.set('n', '<leader>J', '<cmd>cnext<cr>')
-vim.keymap.set('n', '<leader>K', '<cmd>cprev<cr>')
 
 -- terminal split, and terminal shortcuts
 vim.keymap.set('n', '<c-`>', '<c-w>s:terminal<cr>i')
@@ -625,5 +654,4 @@ vim.keymap.set('n', '<d-leftrelease>', function()
   end
 end, { silent = true })
 
--- -----------------------------------------------------------------------------
 -- =============================================================================
