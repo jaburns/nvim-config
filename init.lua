@@ -45,7 +45,7 @@ vim.opt.swapfile = false
 vim.opt.ignorecase = true
 vim.opt.smartcase  = true
 
-local DEFAULT_PROJECT_PATH = '~/dev/sdl3game'
+local DEFAULT_PROJECT_PATH = '~/dev/kaizogame/Auxiliary/editor'
 
 -- -----------------------------------------------------------------------------
 
