@@ -84,7 +84,7 @@ require('lazy').setup({
   {
     'cormacrelf/dark-notify', -- auto-toggle dark mode and light mode
     config = function()
-      require("dark_notify").run({
+      require('dark_notify').run({
         onchange = function(mode)
           if mode == 'dark' then
             vim.cmd.highlight 'Normal guibg=#1E2132'
@@ -104,8 +104,8 @@ require('lazy').setup({
         view_options = { show_hidden = true },
         watch_for_changes = true,
         keymaps = {
-          ["-"] = { "actions.close", mode = "n" },
-          ["<leader>o"] = "actions.open_external",
+          ['-'] = { 'actions.close', mode = 'n' },
+          ['<leader>o'] = 'actions.open_external',
         }
       })
       vim.keymap.set('n', '-', function() oil.open() end)
@@ -215,20 +215,22 @@ require('lazy').setup({
       require('trouble').setup{
         focus = true,
         win = {
-          type = "split",
-          relative = "win",
-          position = "bottom",
+          type = 'split',
+          relative = 'win',
+          position = 'bottom',
           size = 20,
         },
         preview = {
-          type = "main",
+          type = 'main',
           scratch = false,
         },
       }
-      vim.api.nvim_set_hl(0, "TroublePreview", {
-        bg = "#ffff00",
-        fg = "#000000",
+      vim.api.nvim_set_hl(0, 'TroublePreview', {
+        bg = '#ffff00',
+        fg = '#000000',
       })
+      vim.keymap.set('n', '<leader>j', function() require('trouble').next({skip_groups = true, jump = true}) end)
+      vim.keymap.set('n', '<leader>k', function() require('trouble').prev({skip_groups = true, jump = true}) end)
     end
   },
 -- -----------------------------------------------------------------------------
@@ -355,18 +357,18 @@ require('lazy').setup({
     opts = {},
     config = function()
       -- local highlight = {
-      --     "RainbowRed",
-      --     "RainbowGreen",
-      --     "RainbowBlue",
+      --     'RainbowRed',
+      --     'RainbowGreen',
+      --     'RainbowBlue',
       -- }
-      -- local hooks = require "ibl.hooks"
+      -- local hooks = require 'ibl.hooks'
       -- hooks.register(hooks.type.HIGHLIGHT_SETUP, function()
-      --     vim.api.nvim_set_hl(0, "RainbowRed", { fg = "#E06C75" })
-      --     vim.api.nvim_set_hl(0, "RainbowGreen", { fg = "#98C379" })
-      --     vim.api.nvim_set_hl(0, "RainbowBlue", { fg = "#61AFEF" })
+      --     vim.api.nvim_set_hl(0, 'RainbowRed', { fg = '#E06C75' })
+      --     vim.api.nvim_set_hl(0, 'RainbowGreen', { fg = '#98C379' })
+      --     vim.api.nvim_set_hl(0, 'RainbowBlue', { fg = '#61AFEF' })
       -- end)
 
-      require("ibl").setup {
+      require('ibl').setup {
         -- indent = { highlight = highlight },
         scope = { enabled = false },
       }
