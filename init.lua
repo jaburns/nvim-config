@@ -443,6 +443,9 @@ do
   vim.keymap.set('n', '<d-->', down)
   vim.o.guifont = 'Berkeley Mono:h'..vim._j.font_size
   vim.cmd.colorscheme 'highlite-iceberg'
+
+  vim.api.nvim_set_hl(0, 'SpectreSearch',  { link = 'IncSearch' })
+  vim.api.nvim_set_hl(0, 'SpectreReplace', { link = 'DiffAdd'   })
 end
 
 -- -----------------------------------------------------------------------------
