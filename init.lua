@@ -18,6 +18,8 @@ end
 vim.opt.rtp:prepend(lazypath)
 vim._j = {} -- custom global state
 
+vim.env.PATH = vim.fn.expand('~/go/bin') .. ':' .. vim.env.PATH -- for gopls language server binary
+
 -- -----------------------------------------------------------------------------
 
 vim.g.mapleader = ' '
@@ -130,7 +132,7 @@ require('lazy').setup({
     build = ':TSUpdate',
     config = function()
       require('nvim-treesitter.configs').setup {
-        ensure_installed = { 'c', 'cpp', 'c_sharp', 'lua', 'vim', 'bash', 'hlsl' },
+        ensure_installed = { 'c', 'cpp', 'c_sharp', 'go', 'lua', 'vim', 'bash', 'hlsl' },
         indent = { enable = false },
         highlight = { enable = true },
       }
@@ -216,17 +218,17 @@ require('lazy').setup({
         },
       }
 
-      vim.lsp.config.vtsls = {
-        cmd = { 'vtsls', '--stdio' },
-        root_dir = function(bufnr) return root_for(bufnr, { 'tsconfig.json', 'jsconfig.json', 'package.json', '.git' }) end,
+      vim.lsp.config.gopls = {
+        cmd = { 'gopls' },
+        root_dir = function(bufnr) return root_for(bufnr, { 'go.mod', 'go.work', '.git' }) end,
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
-        on_attach = on_lsp_attach('typescript'),
-        filetypes = { 'typescript', 'typescriptreact', 'javascript', 'javascriptreact' },
+        on_attach = on_lsp_attach('go'),
+        filetypes = { 'go', 'gomod', 'gowork', 'gotmpl' },
       }
 
       vim.lsp.enable('clangd')
       vim.lsp.enable('omnisharp')
-      vim.lsp.enable('vtsls')
+      vim.lsp.enable('gopls')
 
       local function ensure_started(server, bufnr)
         for _, c in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
@@ -256,8 +258,8 @@ require('lazy').setup({
       })
 
       vim.api.nvim_create_autocmd('FileType', {
-        pattern = vim.lsp.config.vtsls.filetypes,
-        callback = function(args) ensure_started('vtsls', args.buf) end,
+        pattern = vim.lsp.config.gopls.filetypes,
+        callback = function(args) ensure_started('gopls', args.buf) end,
       })
     end,
   },
