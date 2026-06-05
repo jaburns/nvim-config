@@ -196,12 +196,12 @@ require('lazy').setup({
       }
       vim.lsp.config.omnisharp = {
         cmd = {
-          vim.fn.expand('~/.local/share/omnisharp/OmniSharp'),
+          vim.fn.expand('~/.local/share/omnisharp/OmniSharp'), -- unzipped https://github.com/OmniSharp/omnisharp-roslyn/releases/download/v1.39.15/omnisharp-osx-arm64-net6.0.tar.gz into this dir
           '--languageserver',
           '--hostPID', pid
         },
         cmd_env= {
-            DOTNET_ROOT = '/opt/homebrew/Cellar/dotnet/9.0.5/libexec',
+            DOTNET_ROOT = '/opt/homebrew/Cellar/dotnet/10.0.108/libexec',
         },
         root_dir = function(bufnr) return root_for(bufnr, { '.svn', '.git' }) end,
         capabilities = require('cmp_nvim_lsp').default_capabilities(),
